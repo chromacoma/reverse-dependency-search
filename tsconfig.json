@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "baseUrl": "./",
+    "outDir": "./dist/",
+    "sourceMap": true,
+    "lib": ["DOM", "ES2015", "ES2016", "ES2017", "ESNext"],
+    "target": "es6",
+    "module": "commonjs",
+    "jsx": "react",
+    "esModuleInterop": true,
+    "allowJs": true,
+    "preserveSymlinks": false,
+    "paths": {
+      "*": ["./*"]
+    }
+  },
+  "lib": ["DOM", "ES2015", "ES2016", "ES2017", "ESNext"],
+  "exclude": ["node_modules", "build", "dist", "*-coverage", "quality", "stats"]
+}
