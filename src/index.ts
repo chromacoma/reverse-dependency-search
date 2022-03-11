@@ -4,13 +4,13 @@ import path from 'path';
 import precinct from 'precinct';
 
 // make true to see files skipped
-const debug = false;
-
 let rootPath = '';
 let targetFile = '';
 
 const filesToScan = [];
 const matchingFiles = [];
+const resolvedDependencies = {};
+const unresolvedDependencies = [];
 
 const pathRegex = '^.*.(ts|tsx|js|jsx)$';
 const skipDirsRegex = '^.*(node_modules|dist)';
@@ -45,12 +45,18 @@ const scan = (directoryName = './data', results = []) => {
 };
 
 const main = async () => {
+  const debug = process.argv.includes('--debug');
+
   do {
-    const dirPath = (await askQuestion('Enter the project root path: ')) as string;
+    const dirPath = (await askQuestion("Enter the project's root path (or the path to package.json): ")) as string;
     try {
       const stat = fs.lstatSync(dirPath);
       if (stat.isDirectory()) {
         rootPath = dirPath.replace(/\/$/, '');
+        continue;
+      }
+      if (stat.isFile()) {
+        rootPath = path.dirname(dirPath).replace(/\/$/, '');
         continue;
       }
     } catch (e) {
@@ -62,12 +68,17 @@ const main = async () => {
   scan(rootPath, filesToScan);
 
   do {
-    const targetFilePath = (await askQuestion('Enter a file to search for: ')) as string;
+    const targetFilePath = (await askQuestion('Enter a file within the project to search for: ')) as string;
     try {
-      const stat = fs.lstatSync(targetFilePath);
-      if (stat.isFile() && targetFilePath.match(`^${rootPath}.+$`)) {
-        targetFile = targetFilePath as string;
-        continue;
+      const resolvedTargetFilePath = targetFilePath.match('^/.*') ? targetFilePath : `${rootPath}/${targetFilePath}`;
+      const stat = fs.lstatSync(resolvedTargetFilePath);
+      if (stat.isFile()) {
+        if (resolvedTargetFilePath.match(`^${rootPath}.+$`)) {
+          targetFile = resolvedTargetFilePath as string;
+          continue;
+        } else {
+          console.log('Please choose a file within the project directory.');
+        }
       }
     } catch (e) {
       // do nothing
@@ -75,11 +86,7 @@ const main = async () => {
     console.log('That is not a valid file');
   } while (targetFile === '');
 
-  console.log('\n');
   console.log(`Searching...`);
-
-  let skippedFiles = 0;
-  let foundFiles = 0;
 
   for (const filePath of filesToScan) {
     const deps = precinct.paperwork(filePath, 'utf8');
@@ -100,29 +107,44 @@ const main = async () => {
           }
         }
       }
-      if (!result) {
-        if (debug) console.log(depPath);
-        skippedFiles += 1;
-      } else {
+      if (result) {
         resolvedPaths.push(result);
-        foundFiles += 1;
+        if (!Object.values(resolvedDependencies).includes(result)) {
+          resolvedDependencies[depPath] = result;
+        }
+      } else {
+        if (!unresolvedDependencies.includes(depPath)) {
+          unresolvedDependencies.push(depPath);
+        }
       }
     }
     const filteredPaths = resolvedPaths.filter((resolvedPath) => {
-      return resolvedPath.indexOf('node_modules') === -1;
+      return !resolvedPath.match(skipDirsRegex);
     });
     if (filteredPaths.includes(targetFile)) {
       matchingFiles.push(filePath);
     }
   }
-  console.log('\n');
-  console.log(`Packages resolved: ${foundFiles}`);
-  console.log(`Packages skipped: ${skippedFiles}`);
+  console.log(`Dependencies resolved: ${Object.keys(resolvedDependencies).length}`);
+  if (debug && Object.keys(resolvedDependencies).length > 0) {
+    for (const resolvedDependency of Object.keys(resolvedDependencies).sort()) {
+      console.log(`${resolvedDependency} --> ${resolvedDependencies[resolvedDependency]}`);
+    }
+    console.log('------------------------------');
+  }
+  console.log(`Dependencies skipped: ${unresolvedDependencies.length}`);
+  if (debug && unresolvedDependencies.length) {
+    for (const unresolvedDependency of unresolvedDependencies.sort()) {
+      console.log(unresolvedDependency);
+    }
+    console.log('------------------------------');
+  }
+
   console.log(`Files found: ${matchingFiles.length}`);
   matchingFiles.forEach((file) => {
     console.log(file);
   });
-  console.log('\n');
+  console.log('------------------------------');
 };
 
 main();
