@@ -30,7 +30,7 @@ const askQuestion = async (query) => {
   );
 };
 
-const scan = (directoryName = './data', results = []) => {
+const scan = (directoryName: string, results = []) => {
   const files = fs.readdirSync(directoryName);
   for (const f of files) {
     const fullPath = path.join(directoryName, f);
