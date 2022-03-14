@@ -69,8 +69,8 @@ const main = async () => {
 
   do {
     const targetFilePath = (await askQuestion('Enter a file within the project to search for: ')) as string;
+    const resolvedTargetFilePath = targetFilePath.match('^/.*') ? targetFilePath : `${rootPath}/${targetFilePath}`;
     try {
-      const resolvedTargetFilePath = targetFilePath.match('^/.*') ? targetFilePath : `${rootPath}/${targetFilePath}`;
       const stat = fs.lstatSync(resolvedTargetFilePath);
       if (stat.isFile()) {
         if (resolvedTargetFilePath.match(`^${rootPath}.+$`)) {
@@ -81,9 +81,9 @@ const main = async () => {
         }
       }
     } catch (e) {
-      // do nothing
+      const fileDeletedContinue = (await askQuestion("File doesn't exist. Continue? [yN] ")) as string;
+      if (fileDeletedContinue === 'y') targetFile = resolvedTargetFilePath as string;
     }
-    console.log('That is not a valid file');
   } while (targetFile === '');
 
   console.log(`Searching...`);
