@@ -38,12 +38,6 @@ export const dependencies = (path: string): DependenciesResult => {
 
         for (const template of templates) {
           const templateReferences = extractFilesFromTemplate(template);
-          // if (
-          //   template ===
-          //   '/Users/jadair/work/github.com/change/fe/rendr-fe/apps/change/app/templates/petitions/components/partials/single_click_sign_share_flash_messages.emblem'
-          // ) {
-          //   console.log(templateReferences);
-          // }
           for (const templateReference of templateReferences) {
             const templateFile = fs.existsSync(p.join(templateDirToSearch, `${templateReference}.emblem`))
               ? p.join(templateDirToSearch, `${templateReference}.emblem`)
@@ -65,7 +59,6 @@ export const dependencies = (path: string): DependenciesResult => {
                 const matchingView = viewForTemplate(template);
                 if (matchingView) matchingFiles.push(matchingView);
               }
-              // matchingFiles.push(templateView);
             }
           }
         }
@@ -94,8 +87,6 @@ const extractFilesFromTemplate = (templatePath: string): TemplateReferences => {
   for (const line of lines) {
     const match = line.match(`^.*(${INCLUDE_METHODS.join('|')})\\s*?['"](.+?)['"].*$`);
     if (match) {
-      console.log(line);
-      console.log(match[2]);
       fileRefs.push(match[2]);
     }
   }
