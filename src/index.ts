@@ -1,51 +1,30 @@
-import readline from 'readline';
 import fs from 'fs';
 import path from 'path';
 import precinct from 'precinct';
+import { dependencies as rendrDependencies } from './templates/rendr';
+import { askQuestion } from './util/askQuestion';
+import { buildPathRegex } from './util/buildPathRegex';
+import { scan, SKIP_DIRS_REGEX } from './util/scan';
 
 // make true to see files skipped
 let rootPath = '';
 let targetFile = '';
 
-const filesToScan = [];
 const matchingFiles = [];
 const resolvedDependencies = {};
 const unresolvedDependencies = [];
 
-const pathRegex = '^.*.(ts|tsx|js|jsx)$';
-const skipDirsRegex = '^.*(node_modules|dist)';
-const allowedExtensions = ['', '.js', '.jsx', '.ts', '.tsx', '.json'];
-
-const askQuestion = async (query) => {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return new Promise((resolve) =>
-    rl.question(query, (ans) => {
-      rl.close();
-      resolve(ans);
-    }),
-  );
-};
-
-const scan = (directoryName: string, results = []) => {
-  const files = fs.readdirSync(directoryName);
-  for (const f of files) {
-    const fullPath = path.join(directoryName, f);
-    const stat = fs.statSync(fullPath);
-    if (stat.isDirectory() && !fullPath.match(skipDirsRegex)) {
-      scan(fullPath, results);
-    } else if (fullPath.match(pathRegex)) {
-      results.push(fullPath);
-    }
-  }
-  return results;
-};
+export const DEFAULT_EXTENSIONS = ['', '.js', '.jsx', '.ts', '.tsx', '.json'];
 
 const main = async () => {
-  const debug = process.argv.includes('--debug');
+  const debug = process.argv.includes('--debug') || process.argv.includes('-d');
+  const template = process.argv.includes('-t')
+    ? process.argv[process.argv.indexOf('-t') + 1]
+    : process.argv.includes('--template')
+    ? process.argv[process.argv.indexOf('--template') + 1]
+    : null;
+
+  const allowedExtensions = [...DEFAULT_EXTENSIONS];
 
   do {
     const dirPath = (await askQuestion("Enter the project's root path (or the path to package.json): ")) as string;
@@ -65,13 +44,13 @@ const main = async () => {
     console.log('That is not a valid directory');
   } while (rootPath === '');
 
-  scan(rootPath, filesToScan);
+  const filesToScan = scan(rootPath, buildPathRegex(allowedExtensions));
 
   do {
     const targetFilePath = (await askQuestion('Enter a file within the project to search for: ')) as string;
     const resolvedTargetFilePath = targetFilePath.match('^/.*') ? targetFilePath : `${rootPath}/${targetFilePath}`;
     try {
-      const stat = fs.lstatSync(resolvedTargetFilePath);
+      const stat = fs.statSync(resolvedTargetFilePath);
       if (stat.isFile()) {
         if (resolvedTargetFilePath.match(`^${rootPath}.+$`)) {
           targetFile = resolvedTargetFilePath as string;
@@ -86,7 +65,7 @@ const main = async () => {
     }
   } while (targetFile === '');
 
-  console.log(`Searching...`);
+  console.log(`Searching dependencies...`);
 
   for (const filePath of filesToScan) {
     const deps = precinct.paperwork(filePath, 'utf8');
@@ -119,12 +98,25 @@ const main = async () => {
       }
     }
     const filteredPaths = resolvedPaths.filter((resolvedPath) => {
-      return !resolvedPath.match(skipDirsRegex);
+      return !resolvedPath.match(SKIP_DIRS_REGEX);
     });
     if (filteredPaths.includes(targetFile)) {
       matchingFiles.push(filePath);
     }
   }
+
+  if (template === 'rendr') {
+    console.log(`Searching template files...`);
+    const {
+      resolvedDependencies: rendrResolvedDependencies,
+      unresolvedDependencies: rendrUnesolvedDependencies,
+      matchingFiles: renderMatchingFiles,
+    } = rendrDependencies(targetFile);
+    Object.assign(resolvedDependencies, rendrResolvedDependencies);
+    unresolvedDependencies.push(...rendrUnesolvedDependencies);
+    matchingFiles.push(...renderMatchingFiles);
+  }
+
   console.log(`Dependencies resolved: ${Object.keys(resolvedDependencies).length}`);
   if (debug && Object.keys(resolvedDependencies).length > 0) {
     for (const resolvedDependency of Object.keys(resolvedDependencies).sort()) {
