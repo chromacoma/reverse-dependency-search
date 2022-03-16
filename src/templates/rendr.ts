@@ -65,6 +65,8 @@ export const dependencies = (path: string): DependenciesResult => {
       }
     }
     matchingFiles.push(isView ? templatePath : viewPath);
+    const controllerFile = controllerForView(viewPath);
+    if (controllerFile) matchingFiles.push(controllerFile);
   }
 
   return { resolvedDependencies, unresolvedDependencies, matchingFiles };
@@ -72,10 +74,16 @@ export const dependencies = (path: string): DependenciesResult => {
 
 const INCLUDE_METHODS = ['view', 'partial'];
 
-const viewForTemplate = (templatePath: string): string | undefined => {
+const viewForTemplate = (templatePath: string): string | null => {
   const matcher = templatePath.match('^(.*)/templates/(.*).emblem$');
   const viewPath = p.join(matcher[1], 'views', `${matcher[2]}.js`);
   return fs.existsSync(viewPath) ? viewPath : null;
+};
+
+const controllerForView = (viewPath: string): string | null => {
+  const matcher = viewPath.match('^(.*)/views/(.*).js$');
+  const controllerPath = p.join(matcher[1], 'controllers', `${matcher[2].replace(/\/.*?$/, '')}_controller.js`);
+  return fs.existsSync(controllerPath) ? controllerPath : null;
 };
 
 type TemplateReferences = string[];
